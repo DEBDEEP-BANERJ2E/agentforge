@@ -85,10 +85,12 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         else:
             current_prompt = prompt
         
-        # Call Bob Shell
+        # Call Bob Shell (using PowerShell to execute bob.ps1)
+        bob_path = r"C:\Users\My Laptop\AppData\Roaming\npm\bob.ps1"
         try:
             result = subprocess.run(
-                ["bob", "--chat-mode=code", "--hide-intermediary-output", "--yolo", current_prompt],
+                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", bob_path, 
+                 "--chat-mode=code", "--hide-intermediary-output", "--yolo", current_prompt],
                 capture_output=True,
                 text=True,
                 timeout=180,
@@ -173,7 +175,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         if not validation_errors:
             # Convert python files dict to list of ToolFile objects
             tools = [
-                ToolFile(filename=filename, code=code)
+                ToolFile(filename=filename, content=code)
                 for filename, code in python_files_dict.items()
             ]
             
@@ -194,7 +196,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         if attempt == max_retries:
             # Convert python files dict to list of ToolFile objects (even if invalid)
             tools = [
-                ToolFile(filename=filename, code=code)
+                ToolFile(filename=filename, content=code)
                 for filename, code in python_files_dict.items()
             ]
             
