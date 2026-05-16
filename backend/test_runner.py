@@ -10,7 +10,7 @@ def main():
     print("=" * 80)
     
     # Test prompt
-    user_prompt = "agent that fetches top 5 hacker news stories and summarizes them"
+    user_prompt = "agent that converts markdown text to formatted HTML"
     
     print(f"User Prompt: {user_prompt}")
     print("=" * 80)

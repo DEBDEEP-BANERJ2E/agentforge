@@ -1,8 +1,0 @@
-{"id":"877b4603-def4-4d37-a15f-98fd915950c7","ts":"2026-05-16T18:53:34.967Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\prompts\\architect_prompt.txt","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"46489c46-2c93-4960-82e0-155f76f17fae","ts":"2026-05-16T18:54:33.755Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\parsers.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"974fe668-0a89-4c94-9f3a-75f44ccac6cc","ts":"2026-05-16T18:56:57.336Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\validators.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"4a64c1b0-ca11-4274-af42-dbf332c2518a","ts":"2026-05-16T18:59:07.677Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\bob_runner.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"b4b829bf-81ba-4134-a3e8-8ef7fb61aa88","ts":"2026-05-16T19:01:36.421Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\test_runner.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"026c5632-1f9f-44fa-b021-0b43fd56f91b","ts":"2026-05-16T19:03:40.004Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\bob_runner.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"b9ebb81c-dfc6-43a5-92a2-c2fa98d1f2ab","ts":"2026-05-16T19:06:26.916Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\bob_runner.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}
-{"id":"beac5d4f-ce82-402c-aa96-64ace46a5201","ts":"2026-05-16T19:06:32.731Z","path":"D:\\All Python\\BOB Hackathon\\agentforge\\backend\\bob_runner.py","version":"1.0.0","taskID":"d0c3a3dc-dca4-4d95-9542-5dd14b3c82a3"}

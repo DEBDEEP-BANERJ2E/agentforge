@@ -7,12 +7,112 @@ using Bob Shell with automatic validation and retry logic.
 
 import subprocess
 import os
+import re
+import shutil
+import platform
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 from models import AgentGenerationResult, ToolFile
 from parsers import extract_yaml_block, extract_python_files, extract_requirements
 from validators import validate_agent_yaml, validate_python_file
+
+
+def find_bob_executable() -> str:
+    """
+    Find the Bob Shell executable on the system.
+    
+    Checks in order:
+    1. BOB_BIN environment variable
+    2. 'bob' on PATH using shutil.which
+    3. On Windows, also tries 'bob.cmd'
+    
+    Returns:
+        Path to bob executable
+        
+    Raises:
+        FileNotFoundError: If bob executable cannot be found
+    """
+    # Check environment variable first
+    bob_bin = os.environ.get('BOB_BIN')
+    if bob_bin and os.path.isfile(bob_bin):
+        return bob_bin
+    
+    # Try to find 'bob' on PATH
+    bob_path = shutil.which('bob')
+    if bob_path:
+        return bob_path
+    
+    # On Windows, also try bob.cmd
+    if platform.system() == 'Windows':
+        bob_cmd = shutil.which('bob.cmd')
+        if bob_cmd:
+            return bob_cmd
+    
+    raise FileNotFoundError(
+        "Bob Shell executable not found. Please ensure 'bob' is in your PATH "
+        "or set the BOB_BIN environment variable to the full path of the bob executable."
+    )
+
+
+def extract_session_id(stdout: str) -> str:
+    """
+    Extract session ID from Bob Shell output.
+    
+    Searches for patterns like "session:" or "task-" followed by alphanumeric characters.
+    If not found, generates a timestamp-based ID.
+    
+    Args:
+        stdout: The stdout from Bob Shell execution
+        
+    Returns:
+        Session ID string
+    """
+    # Try to find session ID patterns
+    patterns = [
+        r'session:\s*([a-zA-Z0-9_-]+)',
+        r'(task-[a-zA-Z0-9_-]+)',
+        r'session_id:\s*([a-zA-Z0-9_-]+)',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, stdout, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    
+    # If no session ID found, generate timestamp-based ID
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return f"session_{timestamp}"
+
+
+def save_session_output(session_id: str, stdout: str, script_dir: Path) -> None:
+    """
+    Save Bob Shell output to a session file.
+    
+    Creates bob_sessions/ folder in repo root if it doesn't exist,
+    and writes the raw stdout to bob_sessions/<session_id>.txt
+    
+    Args:
+        session_id: The session identifier
+        stdout: The stdout content to save
+        script_dir: Path to the backend directory
+    """
+    # Go one level up from backend/ to get repo root
+    repo_root = script_dir.parent
+    sessions_dir = repo_root / "bob_sessions"
+    
+    # Create directory if it doesn't exist
+    sessions_dir.mkdir(exist_ok=True)
+    
+    # Write session output
+    session_file = sessions_dir / f"{session_id}.txt"
+    try:
+        with open(session_file, 'w', encoding='utf-8') as f:
+            f.write(stdout)
+    except Exception as e:
+        # Don't fail the whole process if we can't save the session
+        print(f"Warning: Failed to save session output: {str(e)}")
 
 
 def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationResult:
@@ -72,6 +172,20 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
     # Replace placeholder with user prompt
     prompt = prompt_template.replace("{USER_PROMPT}", user_prompt)
     
+    # Find bob executable
+    try:
+        bob_executable = find_bob_executable()
+    except FileNotFoundError as e:
+        return AgentGenerationResult(
+            status="bob_error",
+            agent_yaml=None,
+            tools=[],
+            requirements_txt=None,
+            raw_bob_output="",
+            bob_session_id="",
+            errors=[str(e)]
+        )
+    
     # Retry loop
     accumulated_errors = []
     
@@ -85,12 +199,10 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         else:
             current_prompt = prompt
         
-        # Call Bob Shell (using PowerShell to execute bob.ps1)
-        bob_path = r"C:\Users\My Laptop\AppData\Roaming\npm\bob.ps1"
+        # Call Bob Shell with cross-platform command
         try:
             result = subprocess.run(
-                ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", bob_path, 
-                 "--chat-mode=code", "--hide-intermediary-output", "--yolo", current_prompt],
+                [bob_executable, "--chat-mode=code", "--hide-intermediary-output", "--yolo", current_prompt],
                 capture_output=True,
                 text=True,
                 timeout=180,
@@ -100,6 +212,12 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
             stdout = result.stdout
             stderr = result.stderr
             
+            # Extract session ID from output
+            session_id = extract_session_id(stdout)
+            
+            # Save session output
+            save_session_output(session_id, stdout, script_dir)
+            
             # Check if subprocess failed
             if result.returncode != 0:
                 return AgentGenerationResult(
@@ -108,7 +226,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                     tools=[],
                     requirements_txt=None,
                     raw_bob_output=stdout,
-                    bob_session_id="",
+                    bob_session_id=session_id,
                     errors=[f"Bob Shell failed with exit code {result.returncode}", stderr]
                 )
             
@@ -121,16 +239,6 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                 raw_bob_output="",
                 bob_session_id="",
                 errors=["Bob Shell execution timed out after 180 seconds"]
-            )
-        except FileNotFoundError:
-            return AgentGenerationResult(
-                status="bob_error",
-                agent_yaml=None,
-                tools=[],
-                requirements_txt=None,
-                raw_bob_output="",
-                bob_session_id="",
-                errors=["Bob Shell executable not found. Make sure 'bob' is in your PATH"]
             )
         except Exception as e:
             return AgentGenerationResult(
@@ -185,7 +293,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                 tools=tools,
                 requirements_txt=requirements_txt,
                 raw_bob_output=stdout,
-                bob_session_id="",
+                bob_session_id=session_id,
                 errors=[]
             )
         
@@ -206,7 +314,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                 tools=tools,
                 requirements_txt=requirements_txt,
                 raw_bob_output=stdout,
-                bob_session_id="",
+                bob_session_id=session_id,
                 errors=validation_errors
             )
     

@@ -40,10 +40,11 @@ def extract_python_files(text: str) -> Dict[str, str]:
     """
     Extract Python code files from fenced code blocks with filename comments.
     
-    Searches for ```python blocks where the first line is a comment like:
-    # filename: something.py
-    or
-    # something.py
+    Searches for ```python blocks where the VERY FIRST LINE matches exactly:
+    # filename: <name>.py
+    where <name> is alphanumeric + underscores only.
+    
+    Does NOT accept loose forms like "# tool_name.py" without "filename:" prefix.
     
     Args:
         text: The text containing Python code blocks
@@ -70,12 +71,11 @@ def extract_python_files(text: str) -> Dict[str, str]:
         if not lines:
             continue
             
-        # Check if first line is a filename comment
+        # Check if first line matches EXACTLY: # filename: <name>.py
         first_line = lines[0].strip()
-        filename = None
         
-        # Match patterns like "# filename: something.py" or "# something.py"
-        filename_pattern = r'^#\s*(?:filename:\s*)?([a-zA-Z0-9_]+\.py)\s*$'
+        # Only accept the strict pattern with "filename:" prefix
+        filename_pattern = r'^#\s*filename:\s*([a-zA-Z0-9_]+\.py)\s*$'
         filename_match = re.match(filename_pattern, first_line)
         
         if filename_match:
@@ -91,25 +91,39 @@ def extract_requirements(text: str) -> Optional[str]:
     """
     Extract content from a requirements.txt fenced code block.
     
-    Searches for content within ```txt ... ``` blocks that appear to be
-    requirements files.
+    Searches for content within ```txt or ```text blocks where the VERY FIRST LINE
+    is exactly: # filename: requirements.txt
+    
+    Does NOT accept loose forms like "# requirements.txt" without "filename:" prefix.
     
     Args:
         text: The text containing the requirements code block
         
     Returns:
-        The requirements content as a string, or None if not found
+        The requirements content as a string, or None if not found or sentinel missing
         
     Example:
-        >>> text = "```txt\\nrequests>=2.0.0\\npandas\\n```"
+        >>> text = "```txt\\n# filename: requirements.txt\\nrequests>=2.0.0\\n```"
         >>> extract_requirements(text)
-        'requests>=2.0.0\\npandas'
+        'requests>=2.0.0'
     """
-    # Pattern to match ```txt blocks
-    pattern = r'```txt\s*\n(.*?)```'
+    # Pattern to match ```txt or ```text blocks
+    pattern = r'```(?:txt|text)\s*\n(.*?)```'
     match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
     
     if match:
-        return match.group(1).strip()
+        content = match.group(1)
+        lines = content.split('\n')
+        
+        if not lines:
+            return None
+        
+        # Check if first line matches EXACTLY: # filename: requirements.txt
+        first_line = lines[0].strip()
+        sentinel_pattern = r'^#\s*filename:\s*requirements\.txt\s*$'
+        
+        if re.match(sentinel_pattern, first_line):
+            # Return the rest of the content (excluding the sentinel line)
+            return '\n'.join(lines[1:]).strip()
     
     return None
