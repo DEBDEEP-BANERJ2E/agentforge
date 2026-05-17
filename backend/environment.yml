@@ -9,6 +9,10 @@ dependencies:
       # Core ADK
       - ibm-watsonx-orchestrate==2.9.0
       
+      # watsonx.ai SDK (replaces Bob Shell CLI)
+      - ibm-watsonx-ai==1.1.0
+      - ibm-cloud-sdk-core==3.20.0
+      
       # FastAPI Backend
       - fastapi==0.115.0
       - uvicorn==0.32.0
@@ -24,6 +28,7 @@ dependencies:
       - python-dotenv==1.0.0
 
 # Complete environment for AgentForge
-# Includes: ADK, FastAPI backend, HTTP clients, and utilities
+# Includes: ADK, watsonx.ai SDK, FastAPI backend, HTTP clients, and utilities
 # Critical: Python 3.12 required (3.13 breaks pip/ADK compatibility)
+# Note: Uses watsonx.ai API instead of Bob Shell CLI (which is not publicly available)
 

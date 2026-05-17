@@ -9,3 +9,16 @@ venv/
 dist/
 build/
 .pytest_cache/
+generated_agents/
+node_modules/
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+
+# Bob sessions (keep .gitkeep)
+bob_sessions/*
+!bob_sessions/.gitkeep
+
+# Made with Bob

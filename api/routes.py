@@ -21,7 +21,8 @@ from pydantic import BaseModel, Field
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-from bob_runner import generate_agent
+# Use watsonx_runner instead of bob_runner (Bob CLI not publicly available)
+from watsonx_runner import generate_agent
 from deploy_agent import deploy_agent
 from models import AgentGenerationResult, DeploymentResult
 
