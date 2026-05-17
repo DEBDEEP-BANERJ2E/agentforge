@@ -108,3 +108,178 @@ HARD RULES:
 - NEVER put user input as a query param when the API expects a path segment — this causes 404 errors
 - Open-Meteo weather and air quality APIs require latitude/longitude — ALWAYS geocode INSIDE the tool function using https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1 then use the returned lat/lon. NEVER create a separate geocoding tool.
 - NEVER split geocoding into its own tool. The tool the user calls must take city: str and handle geocoding internally.
+- NEVER call a helper function that is not defined in the same file. Every function you call must be defined in the same code block. Do NOT use await on undefined names like geocode(), search(), lookup() etc.
+- For currency conversion, ALWAYS use https://open.er-api.com/v6/latest/{FROM_CURRENCY} (free, no auth, no redirects). NEVER use frankfurter.app or frankfurter.dev — they return 403 errors.
+
+REFERENCE EXAMPLE — for any request combining crypto prices AND currency conversion, produce exactly this structure:
+
+```yaml
+spec_version: v1
+kind: native
+name: crypto_currency_agent
+description: Fetches current prices of Bitcoin, Ethereum, and Solana in USD and converts currency amounts
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  You help users get current crypto prices and convert between currencies.
+  Use fetch_crypto_prices to get Bitcoin, Ethereum, and Solana prices in USD.
+  Use convert_currency to convert any amount from one currency to another.
+tools: [fetch_crypto_prices, convert_currency]
+```
+
+```python
+# filename: fetch_crypto_prices.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import json
+
+@tool
+async def fetch_crypto_prices() -> dict:
+    """Fetch current prices of Bitcoin, Ethereum, and Solana in USD from CoinGecko.
+
+    Returns:
+        A dictionary containing the current prices in USD
+    """
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {
+        "bitcoin_usd": data.get("bitcoin", {}).get("usd"),
+        "ethereum_usd": data.get("ethereum", {}).get("usd"),
+        "solana_usd": data.get("solana", {}).get("usd"),
+    }
+```
+
+```python
+# filename: convert_currency.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import json
+
+@tool
+async def convert_currency(amount: float, from_currency: str, to_currency: str) -> dict:
+    """Convert a currency amount from one currency to another.
+
+    Args:
+        amount: The amount to convert
+        from_currency: The ISO 4217 currency code to convert from (e.g. USD, EUR, GBP)
+        to_currency: The ISO 4217 currency code to convert to (e.g. INR, IDR, JPY)
+
+    Returns:
+        A dictionary containing the converted amount and exchange rate
+    """
+    url = f"https://open.er-api.com/v6/latest/{from_currency.upper()}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    if data.get("result") != "success":
+        return {"error": f"Could not fetch exchange rates for {from_currency}"}
+    rates = data.get("rates", {})
+    rate = rates.get(to_currency.upper())
+    if rate is None:
+        return {"error": f"Currency {to_currency} not found"}
+    converted = round(amount * rate, 4)
+    return {
+        "from": from_currency.upper(),
+        "to": to_currency.upper(),
+        "amount": amount,
+        "rate": rate,
+        "converted_amount": converted,
+    }
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```
+
+REFERENCE EXAMPLE — for any request combining Open-Meteo weather AND air quality, produce exactly this structure (with your own agent name/description/instructions, but the same tool pattern):
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_air_quality_agent
+description: Fetches current weather conditions and air quality index for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  You help users get current weather and air quality for any city.
+  Always call both fetch_weather and fetch_air_quality and present the results together.
+tools: [fetch_weather, fetch_air_quality]
+```
+
+```python
+# filename: fetch_weather.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def fetch_weather(city: str) -> dict:
+    """Fetch current weather conditions for a given city using the Open-Meteo API.
+
+    Args:
+        city: The city name
+
+    Returns:
+        A dictionary containing the current weather conditions
+    """
+    geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1"
+    with urllib.request.urlopen(geocoding_url, timeout=10) as resp:
+        geocoding_data = json.loads(resp.read())
+    results = geocoding_data.get("results", [])
+    if not results:
+        return {"error": f"Could not find location for city: {city}"}
+    lat = results[0].get("latitude")
+    lon = results[0].get("longitude")
+    weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+    with urllib.request.urlopen(weather_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"weather": data.get("current_weather", {})}
+```
+
+```python
+# filename: fetch_air_quality.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def fetch_air_quality(city: str) -> dict:
+    """Fetch current air quality index for a given city using the Open-Meteo air quality API.
+
+    Args:
+        city: The city name
+
+    Returns:
+        A dictionary containing US AQI and PM2.5 values
+    """
+    geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1"
+    with urllib.request.urlopen(geocoding_url, timeout=10) as resp:
+        geocoding_data = json.loads(resp.read())
+    results = geocoding_data.get("results", [])
+    if not results:
+        return {"error": f"Could not find location for city: {city}"}
+    lat = results[0].get("latitude")
+    lon = results[0].get("longitude")
+    aq_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&hourly=pm2_5,us_aqi&timezone=auto&forecast_days=1"
+    with urllib.request.urlopen(aq_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+    aqi_values = hourly.get("us_aqi", [])
+    pm25_values = hourly.get("pm2_5", [])
+    return {
+        "air_quality": {
+            "us_aqi": aqi_values[0] if aqi_values else None,
+            "pm2_5": pm25_values[0] if pm25_values else None,
+            "time": times[0] if times else None,
+        }
+    }
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

@@ -164,6 +164,7 @@ cd frontend && npm run dev
 
 | Feature | Status | Description |
 |---------|--------|-------------|
+| 🤖 AI Generation | ✅ Ready | GroqCloud (Llama 3.3 70B) generates ADK code |
 | 🤖 AI Generation | ✅ Ready | IBM Bob Shell generates ADK-compliant code |
 | ✅ Validation | ✅ Ready | Schema + syntax validation before deploy |
 | 🚀 Deployment | ✅ Ready | Automatic ADK deployment to Orchestrate |
@@ -182,6 +183,10 @@ cd frontend && npm run dev
 | [API_DOCUMENTATION.md](API_DOCUMENTATION.md) | API reference + examples | ✅ Complete |
 | [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) | Deployment configuration | ✅ Complete |
 | [HACKATHON_FINAL_STATUS.md](HACKATHON_FINAL_STATUS.md) | Status + 5 killer demo ideas | ✅ Complete |
+| [bob_sessions/README.md](bob_sessions/README.md) | Bob Shell architecture explanation | ✅ Complete |
+| [GROQ_SETUP_GUIDE.md](GROQ_SETUP_GUIDE.md) | GroqCloud LLM integration | ✅ Complete |
+| [WATSONX_MIGRATION_GUIDE.md](WATSONX_MIGRATION_GUIDE.md) | Architecture evolution history | ✅ Complete |
+| [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md) | Cloud deployment guide | ✅ Complete |
 | [frontend/README.md](frontend/README.md) | Frontend-specific docs | ✅ Complete |
 
 ---

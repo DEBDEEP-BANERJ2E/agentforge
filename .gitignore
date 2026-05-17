@@ -17,8 +17,9 @@ frontend/.next/
 frontend/out/
 frontend/.env*.local
 
-# Bob sessions (keep .gitkeep)
+# Bob sessions (keep .gitkeep and README.md)
 bob_sessions/*
 !bob_sessions/.gitkeep
+!bob_sessions/README.md
 
 # Made with Bob

@@ -149,22 +149,15 @@ def verify_orchestrate_setup() -> Tuple[bool, list[str]]:
         Tuple of (success: bool, errors: list[str])
     """
     errors = []
-    
-    # Check 1: Conda environment
-    if not is_conda_env_active():
-        conda_prefix = get_conda_prefix()
-        if conda_prefix:
-            errors.append(
-                f"Conda environment 'watsonx' is not active. "
-                f"Run: conda activate watsonx"
-            )
-        else:
-            errors.append(
-                "Conda not found. Install Miniconda/Anaconda and create environment: "
-                "conda env create -f backend/environment.yml"
-            )
-        # If conda env is not active, other checks will likely fail
+
+    # Check 1: Conda environment (skip if conda is not installed — e.g. Docker/HF Spaces)
+    conda_installed = shutil.which('conda') is not None
+    if conda_installed and not is_conda_env_active():
+        errors.append(
+            "Conda environment 'watsonx' is not active. Run: conda activate watsonx"
+        )
         return False, errors
+    # If conda is not installed at all, skip this check and proceed
     
     # Check 2: Orchestrate CLI
     cli_ok, cli_msg = verify_orchestrate_cli()

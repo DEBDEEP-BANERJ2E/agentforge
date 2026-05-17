@@ -30,36 +30,25 @@ DEPLOYMENT_TIMEOUT = int(os.environ.get('WXO_AGENT_DEPLOYMENT_TIMEOUT', '300'))
 GENERATED_AGENTS_DIR = Path(__file__).parent / "generated_agents"
 
 
-def get_orchestrate_chat_url(agent_name: str, environment: str = "wx0-AWS") -> str:
+def get_orchestrate_chat_url(agent_name: str = "", environment: str = "wx0-AWS") -> str:
     """
-    Construct the Orchestrate chat URL for a deployed agent.
-    
-    Args:
-        agent_name: Name of the deployed agent
-        environment: Orchestrate environment name (default: wx0-AWS)
-        
+    Construct the Orchestrate agents management URL.
+
     Returns:
-        Direct URL to the agent in Orchestrate chat UI
+        URL to the agents management page in Orchestrate UI
     """
-    # Get service URL from environment variable
     service_url = os.environ.get('ORCHESTRATE_SERVICE_URL', '')
-    
+
     if service_url:
-        # Extract base domain from service URL
-        # Example: https://api.ca-tor.watson-orchestrate.cloud.ibm.com/instances/xxx
-        # Extract: ca-tor.watson-orchestrate.cloud.ibm.com
         try:
             from urllib.parse import urlparse
             parsed = urlparse(service_url)
-            # Replace 'api.' with '' to get the UI domain
             ui_domain = parsed.netloc.replace('api.', '')
-            base_url = f"https://{ui_domain}"
-            return f"{base_url}/agents/{agent_name}"
+            return f"https://{ui_domain}/build/manage#agents"
         except Exception:
             pass
-    
-    # Fallback to generic URL if service URL not configured
-    return f"https://watson-orchestrate.cloud.ibm.com/agents/{agent_name}"
+
+    return "https://watson-orchestrate.cloud.ibm.com/build/manage#agents"
 
 
 def write_agent_files(

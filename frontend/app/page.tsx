@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Loader2, CheckCircle2, XCircle, ExternalLink, ArrowRight, Zap, Globe, Shield, Clock } from 'lucide-react';
-import EmbedGenerator from './components/EmbedGenerator';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -18,13 +17,9 @@ interface TaskStatus {
 }
 
 const EXAMPLES = [
-  { label: 'Weather', prompt: 'Create an agent that fetches the current weather for a given city using the Open-Meteo API' },
-  { label: 'Air Quality', prompt: 'Create an agent that fetches the current air quality index for a given city using the Open-Meteo air quality API' },
-  { label: 'Crypto Prices', prompt: 'Create an agent that fetches the current prices of Bitcoin, Ethereum, and Solana in USD from the CoinGecko public API' },
-  { label: 'Wikipedia', prompt: 'Create an agent that searches Wikipedia for a topic the user provides and returns a plain-English summary' },
-  { label: 'Currency Converter', prompt: 'Create an agent that converts a currency amount from one currency to another using the Frankfurter API' },
-  { label: 'Country Facts', prompt: 'Create an agent that looks up a country by name and returns its capital, population, region, and currencies using the REST Countries API' },
-  { label: 'Dev Jokes', prompt: 'Create an agent that fetches a random programming joke from the JokeAPI' },
+  { label: 'Weather & Air Quality', prompt: 'Create an agent that fetches the current weather conditions and air quality index for a given city using the Open-Meteo weather and air quality APIs' },
+  { label: 'Crypto & Currency', prompt: 'Create an agent that fetches the current prices of Bitcoin, Ethereum, and Solana in USD from the CoinGecko public API, and can also convert a currency amount from one currency to another using the Frankfurter API' },
+  { label: 'GitHub PRs', prompt: 'Create an agent that summarises the open pull requests for a given GitHub repository, showing the PR title, author, and how long it has been open' },
 ];
 
 const STAGES = [
@@ -297,15 +292,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-
-            {/* Embed Generator */}
-            <EmbedGenerator
-              agentId={taskStatus.agent_name || 'agent'}
-              agentName={taskStatus.agent_name || 'AI Agent'}
-              orchestrationID="6c32a116d8ed4b058c1dfd87f61222e6_4e732bf0-848b-4b3d-be31-f80c223c0950"
-              hostURL="https://ca-tor.watson-orchestrate.cloud.ibm.com"
-              crn="crn:v1:bluemix:public:watsonx-orchestrate:ca-tor:a/6c32a116d8ed4b058c1dfd87f61222e6:4e732bf0-848b-4b3d-be31-f80c223c0950::"
-            />
           </>
         )}
 

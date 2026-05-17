@@ -241,7 +241,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         # Parse the output
         agent_yaml = extract_yaml_block(generated_text)
         python_files_dict = extract_python_files(generated_text)
-        requirements_txt = extract_requirements(generated_text)
+        requirements_txt = extract_requirements(generated_text) or "# no external dependencies"
         
         # Validate the parsed content
         validation_errors = []
@@ -280,9 +280,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                 f"Tools referenced in YAML but not found in catalog or generated: {', '.join(missing_tools)}"
             )
         
-        # Check requirements
-        if not requirements_txt:
-            validation_errors.append("No requirements.txt block found in output")
+        # requirements_txt always has a value (defaulted above if model omitted it)
         
         # If validation passed, return success
         if not validation_errors:

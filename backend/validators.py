@@ -143,15 +143,15 @@ def validate_python_file(filename: str, code: str) -> List[str]:
     if not re.search(async_def_pattern, code):
         errors.append("Function must be defined as 'async def', not just 'def'")
     
-    # Check for httpx import
-    httpx_import_pattern = r'import\s+httpx'
-    if not re.search(httpx_import_pattern, code):
-        errors.append("Code must include 'import httpx'")
-    
-    # Check that requests is NOT imported
-    requests_import_pattern = r'import\s+requests|from\s+requests\s+import'
-    if re.search(requests_import_pattern, code):
-        errors.append("Code must NOT import 'requests' library - use 'httpx' instead")
+    # Check for urllib.request import (required; httpx/requests are not available in runtime)
+    if not re.search(r'import\s+urllib\.request', code):
+        errors.append("Code must include 'import urllib.request'")
+
+    # Check that requests/httpx are NOT imported (not available in the runtime)
+    if re.search(r'import\s+requests|from\s+requests\s+import', code):
+        errors.append("Code must NOT import 'requests' — use 'urllib.request' instead")
+    if re.search(r'import\s+httpx|from\s+httpx\s+import', code):
+        errors.append("Code must NOT import 'httpx' — use 'urllib.request' instead")
     
     # Check for ibm_watsonx_orchestrate import
     ibm_import_pattern = r'from\s+ibm_watsonx_orchestrate\.agent_builder\.tools\s+import\s+tool'
