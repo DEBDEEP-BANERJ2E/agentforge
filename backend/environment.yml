@@ -9,8 +9,9 @@ dependencies:
       # Core ADK
       - ibm-watsonx-orchestrate==2.9.0
       
-      # watsonx.ai SDK (replaces Bob Shell CLI)
-      - ibm-watsonx-ai==1.1.0
+      # LLM APIs (choose one or use both)
+      - groq==0.11.0                    # GroqCloud API (recommended - simple, fast, free tier)
+      - ibm-watsonx-ai==1.1.0          # watsonx.ai SDK (requires IBM Cloud provisioning)
       - ibm-cloud-sdk-core==3.20.0
       
       # FastAPI Backend
@@ -28,7 +29,11 @@ dependencies:
       - python-dotenv==1.0.0
 
 # Complete environment for AgentForge
-# Includes: ADK, watsonx.ai SDK, FastAPI backend, HTTP clients, and utilities
+# Includes: ADK, LLM APIs (Groq + watsonx.ai), FastAPI backend, HTTP clients, and utilities
 # Critical: Python 3.12 required (3.13 breaks pip/ADK compatibility)
-# Note: Uses watsonx.ai API instead of Bob Shell CLI (which is not publicly available)
+#
+# LLM Options:
+# - groq_runner.py: Uses GroqCloud (recommended - no IBM provisioning needed)
+# - watsonx_runner.py: Uses watsonx.ai (requires IBM Cloud project)
+# - bob_runner.py: Legacy (Bob Shell CLI not publicly available)
 

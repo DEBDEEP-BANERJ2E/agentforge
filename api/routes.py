@@ -21,8 +21,9 @@ from pydantic import BaseModel, Field
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-# Use watsonx_runner instead of bob_runner (Bob CLI not publicly available)
-from watsonx_runner import generate_agent
+# Use groq_runner (recommended - simple, fast, no IBM provisioning needed)
+# Alternative: watsonx_runner (requires IBM Cloud project provisioning)
+from groq_runner import generate_agent
 from deploy_agent import deploy_agent
 from models import AgentGenerationResult, DeploymentResult
 
