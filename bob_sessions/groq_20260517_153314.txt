@@ -1,0 +1,48 @@
+# Groq Generation Session
+# Session ID: groq_20260517_153314
+# Timestamp: 2026-05-17T15:33:14.364475
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_agent
+description: Fetches current weather for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: Create an agent that fetches the current weather for a given city using the Open-Meteo API.
+tools: [open_meteo]
+```
+
+```python
+# filename: open_meteo.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import httpx
+
+@tool
+async def open_meteo(city: str, latitude: str = None, longitude: str = None) -> dict:
+    """Fetches the current weather for a given city using the Open-Meteo API.
+
+    Args:
+        city: The city name
+        latitude: The city latitude (optional)
+        longitude: The city longitude (optional)
+
+    Returns:
+        A dictionary containing the current weather data
+    """
+    if latitude and longitude:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}"
+    else:
+        url = f"https://api.open-meteo.com/v1/forecast?name={city}"
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        data = response.json()
+        return {"result": data}
+```
+
+```text
+# filename: requirements.txt
+ibm-watsonx-orchestrate==2.9.0
+httpx==0.27.0
+pydantic==2.8.0
+```

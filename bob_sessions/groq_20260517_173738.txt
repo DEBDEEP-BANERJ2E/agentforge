@@ -1,0 +1,53 @@
+# Groq Generation Session
+# Session ID: groq_20260517_173738
+# Timestamp: 2026-05-17T17:37:38.622756
+
+```yaml
+spec_version: v1
+kind: native
+name: country_info_agent
+description: Looks up a country by name and returns its capital, population, region, and currencies
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Look up a country by name and return its capital, population, region, and currencies using the REST Countries API.
+  The agent should take a country name as input and return a dictionary with the country's information.
+tools: [rest_countries_api]
+```
+
+```python
+# filename: rest_countries_api.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def rest_countries_api(country_name: str) -> dict:
+    """Looks up a country by name and returns its capital, population, region, and currencies.
+
+    Args:
+        country_name: The name of the country to look up
+
+    Returns:
+        A dictionary with the country's information
+    """
+    url = f"https://restcountries.com/v3.1/name/{urllib.parse.quote(country_name)}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    if data:
+        country = data[0]
+        return {
+            "capital": country.get("capital", [])[0] if country.get("capital") else "",
+            "population": country.get("population", 0),
+            "region": country.get("region", ""),
+            "currencies": {k: v.get("name", "") for k, v in country.get("currencies", {}).items()}
+        }
+    else:
+        return {"error": "Country not found"}
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

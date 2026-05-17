@@ -1,0 +1,82 @@
+# Groq Generation Session
+# Session ID: llm_20260517_200843
+# Timestamp: 2026-05-17T20:08:43.809584
+
+```yaml
+spec_version: v1
+kind: native
+name: crypto_currency_agent
+description: Fetches current prices of Bitcoin, Ethereum, and Solana in USD and converts currency amounts
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  You help users get current crypto prices and convert between currencies.
+  Use fetch_crypto_prices to get Bitcoin, Ethereum, and Solana prices in USD.
+  Use convert_currency to convert any amount from one currency to another.
+tools: [fetch_crypto_prices, convert_currency]
+```
+
+```python
+# filename: fetch_crypto_prices.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import json
+
+@tool
+async def fetch_crypto_prices() -> dict:
+    """Fetch current prices of Bitcoin, Ethereum, and Solana in USD from CoinGecko.
+
+    Returns:
+        A dictionary containing the current prices in USD
+    """
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {
+        "bitcoin_usd": data.get("bitcoin", {}).get("usd"),
+        "ethereum_usd": data.get("ethereum", {}).get("usd"),
+        "solana_usd": data.get("solana", {}).get("usd"),
+    }
+```
+
+```python
+# filename: convert_currency.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import json
+
+@tool
+async def convert_currency(amount: float, from_currency: str, to_currency: str) -> dict:
+    """Convert a currency amount from one currency to another.
+
+    Args:
+        amount: The amount to convert
+        from_currency: The ISO 4217 currency code to convert from (e.g. USD, EUR, GBP)
+        to_currency: The ISO 4217 currency code to convert to (e.g. INR, IDR, JPY)
+
+    Returns:
+        A dictionary containing the converted amount and exchange rate
+    """
+    url = f"https://open.er-api.com/v6/latest/{from_currency.upper()}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    if data.get("result") != "success":
+        return {"error": f"Could not fetch exchange rates for {from_currency}"}
+    rates = data.get("rates", {})
+    rate = rates.get(to_currency.upper())
+    if rate is None:
+        return {"error": f"Currency {to_currency} not found"}
+    converted = round(amount * rate, 4)
+    return {
+        "from": from_currency.upper(),
+        "to": to_currency.upper(),
+        "amount": amount,
+        "rate": rate,
+        "converted_amount": converted,
+    }
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

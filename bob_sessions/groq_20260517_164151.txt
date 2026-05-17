@@ -1,0 +1,67 @@
+# Groq Generation Session
+# Session ID: groq_20260517_164151
+# Timestamp: 2026-05-17T16:41:51.668486
+
+```yaml
+spec_version: v1
+kind: native
+name: book_search_agent
+description: Search for books by title and fetch detailed info
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: Create an agent with two tools: one that searches for a book by title using the Open Library API and returns the top result, and another that fetches detailed info about that book by its Open Library ID
+tools: [search_book, fetch_book_info]
+```
+
+```python
+# filename: search_book.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def search_book(query: str, limit: int = 10) -> dict:
+    """Search for a book by title using the Open Library API.
+
+    Args:
+        query: The search query
+        limit: Maximum number of results (default: 10)
+
+    Returns:
+        A dictionary containing the search results
+    """
+    params = urllib.parse.urlencode({"q": query, "limit": limit})
+    url = f"http://openlibrary.org/search.json?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"result": data.get("docs", [])}
+```
+
+```python
+# filename: fetch_book_info.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def fetch_book_info(open_library_id: str) -> dict:
+    """Fetch detailed info about a book by its Open Library ID.
+
+    Args:
+        open_library_id: The Open Library ID of the book
+
+    Returns:
+        A dictionary containing the book's detailed info
+    """
+    url = f"http://openlibrary.org/books/{open_library_id}.json"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"result": data}
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

@@ -1,0 +1,102 @@
+# Groq Generation Session
+# Session ID: groq_20260517_165305
+# Timestamp: 2026-05-17T16:53:05.980159
+
+```yaml
+spec_version: v1
+kind: native
+name: github_release_checker
+description: Checks if a GitHub repository is ready to release
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Check if a GitHub repository is ready to release by fetching the latest commits, open pull requests, and failed CI checks from the GitHub public API.
+  Use the GitHub API to fetch the latest commits, open pull requests, and failed CI checks.
+  Return a dictionary with the results.
+tools: [github_commits, github_pull_requests, github_ci_checks]
+```
+
+```python
+# filename: github_commits.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def github_commits(repo_owner: str, repo_name: str, limit: int = 10) -> dict:
+    """Fetch the latest commits from a GitHub repository.
+
+    Args:
+        repo_owner: The owner of the repository
+        repo_name: The name of the repository
+        limit: Maximum number of commits to fetch (default: 10)
+
+    Returns:
+        A dictionary with the latest commits
+    """
+    params = urllib.parse.urlencode({"per_page": limit})
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"commits": data}
+```
+
+```python
+# filename: github_pull_requests.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def github_pull_requests(repo_owner: str, repo_name: str, state: str = "open", limit: int = 10) -> dict:
+    """Fetch the open pull requests from a GitHub repository.
+
+    Args:
+        repo_owner: The owner of the repository
+        repo_name: The name of the repository
+        state: The state of the pull requests (default: "open")
+        limit: Maximum number of pull requests to fetch (default: 10)
+
+    Returns:
+        A dictionary with the open pull requests
+    """
+    params = urllib.parse.urlencode({"state": state, "per_page": limit})
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"pull_requests": data}
+```
+
+```python
+# filename: github_ci_checks.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def github_ci_checks(repo_owner: str, repo_name: str, limit: int = 10) -> dict:
+    """Fetch the failed CI checks from a GitHub repository.
+
+    Args:
+        repo_owner: The owner of the repository
+        repo_name: The name of the repository
+        limit: Maximum number of CI checks to fetch (default: 10)
+
+    Returns:
+        A dictionary with the failed CI checks
+    """
+    params = urllib.parse.urlencode({"per_page": limit})
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/checks?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    failed_checks = [check for check in data if check.get("status", "") == "failure"]
+    return {"failed_checks": failed_checks}
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

@@ -1,0 +1,70 @@
+# Groq Generation Session
+# Session ID: llm_20260517_191914
+# Timestamp: 2026-05-17T19:19:14.399499
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_fetcher
+description: Fetches current weather for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Fetch the current weather for a given city using the Open-Meteo API.
+tools: [geocode_tool, fetch_weather_tool]
+```
+
+```python
+# filename: geocode_tool.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+# For GitHub API calls, ALWAYS include authentication:
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def geocode_tool(city: str) -> dict:
+    """Geocode city name to latitude/longitude using Open-Meteo API.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Geocoding API response data
+    """
+    url = "https://api.open-meteo.com/v1/search?name={}&count=1".format(urllib.parse.quote(city))
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"lat": data["results"][0]["latitude"], "lon": data["results"][0]["longitude"]}
+```
+
+```python
+# filename: fetch_weather_tool.py
+# filename: requirements.txt
+# no external dependencies
+
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def fetch_weather_tool(city: str) -> dict:
+    """Fetch current weather for a given city using Open-Meteo API.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Weather API response data
+    """
+    geocode_data = await geocode_tool(city)
+    lat = geocode_data["lat"]
+    lon = geocode_data["lon"]
+    url = f"https://api.open-meteo.com/v1/forecast?current_weather=true&latitude={lat}&longitude={lon}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"weather": data["current_weather"]}
+```

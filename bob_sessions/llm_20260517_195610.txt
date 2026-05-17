@@ -1,0 +1,90 @@
+# Groq Generation Session
+# Session ID: llm_20260517_195610
+# Timestamp: 2026-05-17T19:56:10.917718
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_air_quality_agent
+description: Fetches current weather conditions and air quality index for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  You help users get current weather and air quality for any city.
+  Always call both fetch_weather and fetch_air_quality and present the results together.
+tools: [fetch_weather, fetch_air_quality]
+```
+```python
+# filename: fetch_weather.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def fetch_weather(city: str) -> dict:
+    """Fetch current weather conditions for a given city using the Open-Meteo API.
+
+    Args:
+        city: The city name
+
+    Returns:
+        A dictionary containing the current weather conditions
+    """
+    geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1"
+    with urllib.request.urlopen(geocoding_url, timeout=10) as resp:
+        geocoding_data = json.loads(resp.read())
+    results = geocoding_data.get("results", [])
+    if not results:
+        return {"error": f"Could not find location for city: {city}"}
+    lat = results[0].get("latitude")
+    lon = results[0].get("longitude")
+    weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+    with urllib.request.urlopen(weather_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"weather": data.get("current_weather", {})}
+```
+```python
+# filename: fetch_air_quality.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def fetch_air_quality(city: str) -> dict:
+    """Fetch current air quality index for a given city using the Open-Meteo air quality API.
+
+    Args:
+        city: The city name
+
+    Returns:
+        A dictionary containing US AQI and PM2.5 values
+    """
+    geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1"
+    with urllib.request.urlopen(geocoding_url, timeout=10) as resp:
+        geocoding_data = json.loads(resp.read())
+    results = geocoding_data.get("results", [])
+    if not results:
+        return {"error": f"Could not find location for city: {city}"}
+    lat = results[0].get("latitude")
+    lon = results[0].get("longitude")
+    aq_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&hourly=pm2_5,us_aqi&timezone=auto&forecast_days=1"
+    with urllib.request.urlopen(aq_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+    aqi_values = hourly.get("us_aqi", [])
+    pm25_values = hourly.get("pm2_5", [])
+    return {
+        "air_quality": {
+            "us_aqi": aqi_values[0] if aqi_values else None,
+            "pm2_5": pm25_values[0] if pm25_values else None,
+            "time": times[0] if times else None,
+        }
+    }
+```
+```text
+# filename: requirements.txt
+# no external dependencies
+```

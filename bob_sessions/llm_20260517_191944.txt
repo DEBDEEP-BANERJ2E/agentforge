@@ -1,0 +1,77 @@
+# Groq Generation Session
+# Session ID: llm_20260517_191944
+# Timestamp: 2026-05-17T19:19:44.614514
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_fetcher
+description: Fetch current weather for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Fetch the current weather for a given city using the Open-Meteo API.
+tools: [geocode_tool, weather_tool]
+
+```
+
+```python
+# filename: geocode_tool.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def geocode_tool(city: str) -> dict:
+    """Geocode a city to get its latitude and longitude.
+    
+    Args:
+        city: The city name
+    
+    Returns:
+        Geocoding API response data
+    """
+    url = "https://geocoding-api.open-meteo.com/v1/search"
+    params = urllib.parse.urlencode({"name": city, "count": 1})
+    url = f"{url}?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"lat": data["results"][0]["latitude"], "lon": data["results"][0]["longitude"]}
+
+```
+
+```python
+# filename: weather_tool.py
+# filename: requirements.txt
+# no external dependencies
+
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+@tool
+async def weather_tool(city: str) -> dict:
+    """Fetch the current weather for a given city.
+    
+    Args:
+        city: The city name
+    
+    Returns:
+        Weather API response data
+    """
+    geocode_result = await geocode_tool(city)
+    lat = geocode_result["lat"]
+    lon = geocode_result["lon"]
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = urllib.parse.urlencode({"latitude": lat, "longitude": lon})
+    url = f"{url}?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"weather": data}
+```

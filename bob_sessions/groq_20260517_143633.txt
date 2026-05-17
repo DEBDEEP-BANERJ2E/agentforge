@@ -1,0 +1,62 @@
+# Groq Generation Session
+# Session ID: groq_20260517_143633
+# Timestamp: 2026-05-17T14:36:33.948278
+
+```yaml
+spec_version: v1
+kind: native
+name: hacker_news_agent
+description: Fetch top 5 Hacker News stories
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: Fetch the top 5 stories from Hacker News and return their titles and URLs.
+tools: [hacker_news_fetcher, json_parser]
+```
+
+```python
+# filename: hacker_news_fetcher.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import httpx
+
+@tool
+async def hacker_news_fetcher(arg: str) -> dict:
+    """Fetch top 5 Hacker News stories.
+    Args:
+        arg: Not used
+    Returns:
+        A dictionary containing the top 5 Hacker News stories
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://hacker-news.firebaseio.com/v0/topstories.json")
+        story_ids = response.json()[:5]
+        stories = []
+        for story_id in story_ids:
+            story_response = await client.get(f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json")
+            story = story_response.json()
+            stories.append({"title": story["title"], "url": story["url"]})
+        return {"stories": stories}
+```
+
+```python
+# filename: json_parser.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import httpx
+
+@tool
+async def json_parser(arg: str) -> dict:
+    """Parse JSON string.
+    Args:
+        arg: JSON string
+    Returns:
+        A dictionary representing the JSON string
+    """
+    async with httpx.AsyncClient() as client:
+        return {"parsed_json": arg}
+```
+
+```text
+# filename: requirements.txt
+ibm-watsonx-orchestrate==2.9.0
+httpx==0.27.0
+pydantic==2.8.0
+```

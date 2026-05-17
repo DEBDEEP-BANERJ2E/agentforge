@@ -1,0 +1,103 @@
+# Groq Generation Session
+# Session ID: llm_20260517_201302
+# Timestamp: 2026-05-17T20:13:02.982922
+
+```yaml
+spec_version: v1
+kind: native
+name: github_pr_summary
+description: Summarises open pull requests for a given GitHub repository
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  You are an assistant that helps users summarize open pull requests for GitHub repositories.
+  When given a repository name in the format "owner/repo", use the fetch_open_prs tool to retrieve a list of open PRs.
+  Present the results in a clear, readable summary showing each PR's title, author, and how long it has been open.
+  The tool returns a list of PR summaries; format and display them clearly.
+tools: [fetch_open_prs]
+```
+```python
+# filename: fetch_open_prs.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+from datetime import datetime, timezone
+
+@tool
+async def fetch_open_prs(repo: str) -> dict:
+    """Fetch all open pull requests from a specified GitHub repository and return a summary with title, author, and open duration.
+
+    Args:
+        repo: Repository name in "owner/repo" format (e.g., "octocat/Hello-World")
+
+    Returns:
+        A dictionary containing a list of open pull requests, each with title, author, and time elapsed since creation.
+    """
+    parts = repo.split('/')
+    if len(parts) != 2:
+        return {"error": "Invalid repository format. Please use 'owner/repo'."}
+    owner, name = parts
+
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+    url = f"https://api.github.com/repos/{owner}/{name}/pulls?state=open"
+
+    req = urllib.request.Request(url)
+    if GITHUB_TOKEN:
+        req.add_header("Authorization", f"token {GITHUB_TOKEN}")
+    req.add_header("Accept", "application/vnd.github.v3+json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            prs = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        return {"error": f"GitHub API error: {e.code} {e.reason}"}
+    except urllib.error.URLError as e:
+        return {"error": f"Network error: {e.reason}"}
+
+    if not isinstance(prs, list):
+        return {"error": "Unexpected response format from GitHub API"}
+
+    summaries = []
+    now = datetime.now(timezone.utc)
+
+    for pr in prs:
+        title = pr.get("title", "No title")
+        author = pr.get("user", {}).get("login", "Unknown")
+        created_at_str = pr.get("created_at", "")
+        if created_at_str:
+            # GitHub uses ISO 8601 with 'Z' – replace with +00:00 for Python <3.11 compatibility
+            naive_str = created_at_str.replace("Z", "+00:00")
+            try:
+                created_at = datetime.fromisoformat(naive_str)
+                delta = now - created_at
+                days = delta.days
+                seconds = delta.seconds
+                hours = seconds // 3600
+                if days > 0:
+                    duration = f"{days} days" + (f", {hours} hours" if hours > 0 else "") + " ago"
+                elif hours > 0:
+                    duration = f"{hours} hours ago"
+                else:
+                    duration = "Less than an hour ago"
+            except (ValueError, TypeError):
+                duration = "Unknown"
+        else:
+            duration = "Unknown"
+
+        summaries.append({
+            "title": title,
+            "author": author,
+            "open_duration": duration
+        })
+
+    if not summaries:
+        return {"pull_requests": [], "message": "No open pull requests found."}
+
+    return {"pull_requests": summaries}
+```
+```text
+# filename: requirements.txt
+# no external dependencies
+```

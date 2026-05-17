@@ -1,0 +1,62 @@
+# Groq Generation Session
+# Session ID: llm_20260517_185358
+# Timestamp: 2026-05-17T18:53:58.447446
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_air_quality
+description: Fetch current weather and air quality for a city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  This agent fetches the current weather conditions and air quality index for a given city.
+  It uses the Open-Meteo air quality API to retrieve the data.
+tools: [open_meteo_weather_air_quality]
+```
+
+```python
+# filename: open_meteo_weather_air_quality.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+@tool
+async def open_meteo_weather_air_quality(city: str) -> dict:
+    """Fetch current weather and air quality for a city.
+
+    Args:
+        city: The city name
+
+    Returns:
+        A dictionary containing the weather and air quality data
+    """
+    geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1"
+    with urllib.request.urlopen(geocoding_url, timeout=10) as resp:
+        geocoding_data = json.loads(resp.read())
+    lat = geocoding_data.get("results", [{}])[0].get("latitude", "")
+    lon = geocoding_data.get("results", [{}])[0].get("longitude", "")
+    
+    if not lat or not lon:
+        return {"error": "Failed to geocode city"}
+    
+    weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+    with urllib.request.urlopen(weather_url, timeout=10) as resp:
+        weather_data = json.loads(resp.read())
+    
+    air_quality_url = f"https://api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&hourly=true"
+    with urllib.request.urlopen(air_quality_url, timeout=10) as resp:
+        air_quality_data = json.loads(resp.read())
+    
+    return {
+        "weather": weather_data.get("current_weather", {}),
+        "air_quality": air_quality_data.get("hourly", {}).get("values", [])
+    }
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

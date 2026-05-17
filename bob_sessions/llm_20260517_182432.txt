@@ -1,0 +1,65 @@
+# Groq Generation Session
+# Session ID: llm_20260517_182432
+# Timestamp: 2026-05-17T18:24:32.692767
+
+```yaml
+spec_version: v1
+kind: native
+name: github_pr_summarizer
+description: Summarize open PRs in a GitHub repository
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Summarize open PRs in a GitHub repository.
+  The repository name should be in the format "owner/repo".
+  The tool should return a summary of the open PRs.
+tools: [github_pr_summarizer_tool]
+```
+
+```python
+# filename: github_pr_summarizer_tool.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def github_pr_summarizer_tool(repo: str) -> dict:
+    """Fetch and summarize open PRs from a GitHub repository.
+    
+    Args:
+        repo: Repository name in format "owner/repo"
+    
+    Returns:
+        A dictionary containing a summary of the open PRs
+    """
+    url = f"https://api.github.com/repos/{repo}/pulls"
+    
+    req = urllib.request.Request(url)
+    if GITHUB_TOKEN:
+        req.add_header("Authorization", f"token {GITHUB_TOKEN}")
+    req.add_header("Accept", "application/vnd.github.v3+json")
+    
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read())
+    
+    summary = []
+    for pr in data:
+        summary.append({
+            "title": pr.get("title", ""),
+            "url": pr.get("html_url", ""),
+            "state": pr.get("state", ""),
+            "created_at": pr.get("created_at", ""),
+            "updated_at": pr.get("updated_at", "")
+        })
+    
+    return {"summary": summary}
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

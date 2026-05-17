@@ -1,0 +1,44 @@
+# Groq Generation Session
+# Session ID: groq_20260517_145352
+# Timestamp: 2026-05-17T14:53:52.232526
+
+```yaml
+spec_version: v1
+kind: native
+name: hacker_news_agent
+description: Fetches top 5 Hacker News stories
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: Fetch the top 5 Hacker News stories and return their titles and URLs.
+tools: [hacker_news_fetcher]
+```
+
+```python
+# filename: hacker_news_fetcher.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import httpx
+
+@tool
+async def hacker_news_fetcher() -> dict:
+    """Fetches the top 5 Hacker News stories.
+    
+    Returns:
+        A dictionary containing the titles and URLs of the top 5 stories.
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty")
+        story_ids = response.json()[:5]
+        stories = []
+        for story_id in story_ids:
+            story_response = await client.get(f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json?print=pretty")
+            story = story_response.json()
+            stories.append({"title": story["title"], "url": story["url"]})
+        return stories
+```
+
+```text
+# filename: requirements.txt
+ibm-watsonx-orchestrate==2.9.0
+httpx==0.27.0
+pydantic==2.8.0
+```

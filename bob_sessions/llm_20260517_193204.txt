@@ -1,0 +1,102 @@
+# Groq Generation Session
+# Session ID: llm_20260517_193204
+# Timestamp: 2026-05-17T19:32:04.970284
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_air_quality_agent
+description: Fetches current weather conditions and air quality index for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Fetch the current weather conditions and air quality index for a given city using the Open-Meteo weather and air quality APIs
+tools: [geocode_weather, fetch_weather, fetch_air_quality]
+```
+
+```python
+# filename: geocode_weather.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def geocode_weather(city: str) -> dict:
+    """Geocode city and fetch weather data.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Geocoded city and weather data
+    """
+    url = "https://geocoding-api.open-meteo.com/v1/search"
+    params = urllib.parse.urlencode({"name": city, "count": 1})
+    url = f"{url}?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    lat = data["results"][0]["latitude"]
+    lon = data["results"][0]["longitude"]
+    return {"city": city, "lat": lat, "lon": lon}
+```
+
+```python
+# filename: fetch_weather.py
+# filename: fetch_air_quality.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def fetch_weather(city: str) -> dict:
+    """Fetch current weather conditions for a given city.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Current weather conditions
+    """
+    geocode = await geocode_weather(city)
+    lat = geocode["lat"]
+    lon = geocode["lon"]
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = urllib.parse.urlencode({"latitude": lat, "longitude": lon})
+    url = f"{url}?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"weather": data}
+
+@tool
+async def fetch_air_quality(city: str) -> dict:
+    """Fetch air quality index for a given city.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Air quality index
+    """
+    geocode = await geocode_weather(city)
+    lat = geocode["lat"]
+    lon = geocode["lon"]
+    url = "https://api.open-meteo.com/v1/airquality"
+    params = urllib.parse.urlencode({"latitude": lat, "longitude": lon})
+    url = f"{url}?{params}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"air_quality": data}
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

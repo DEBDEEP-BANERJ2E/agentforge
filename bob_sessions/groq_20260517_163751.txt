@@ -1,0 +1,59 @@
+# Groq Generation Session
+# Session ID: groq_20260517_163751
+# Timestamp: 2026-05-17T16:37:51.957841
+
+```yaml
+spec_version: v1
+kind: native
+name: crypto_price_fetcher
+description: Fetches current crypto prices
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: Create an agent that fetches the current price of Bitcoin, Ethereum, and Solana in USD from the CoinGecko public API along with their 24-hour percentage change
+tools: [coingecko_api]
+```
+
+```python
+# filename: coingecko_api.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+
+@tool
+async def coingecko_api() -> dict:
+    """Fetches current prices of Bitcoin, Ethereum, and Solana in USD from CoinGecko API.
+
+    Returns:
+        A dictionary containing the current prices and 24-hour percentage changes of the cryptocurrencies.
+    """
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = urllib.parse.urlencode({"ids": "bitcoin,ethereum,solana", "vs_currencies": "usd"})
+    full_url = f"{url}?{params}"
+    with urllib.request.urlopen(full_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    bitcoin_price = data.get("bitcoin", {}).get("usd", 0)
+    ethereum_price = data.get("ethereum", {}).get("usd", 0)
+    solana_price = data.get("solana", {}).get("usd", 0)
+    
+    # Fetch 24-hour percentage changes
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = urllib.parse.urlencode({"vs_currency": "usd", "ids": "bitcoin,ethereum,solana"})
+    full_url = f"{url}?{params}"
+    with urllib.request.urlopen(full_url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    bitcoin_change = next((item.get("price_change_percentage_24h", 0) for item in data if item.get("id", "") == "bitcoin"), 0)
+    ethereum_change = next((item.get("price_change_percentage_24h", 0) for item in data if item.get("id", "") == "ethereum"), 0)
+    solana_change = next((item.get("price_change_percentage_24h", 0) for item in data if item.get("id", "") == "solana"), 0)
+    
+    return {
+        "bitcoin": {"price": bitcoin_price, "change": bitcoin_change},
+        "ethereum": {"price": ethereum_price, "change": ethereum_change},
+        "solana": {"price": solana_price, "change": solana_change}
+    }
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```

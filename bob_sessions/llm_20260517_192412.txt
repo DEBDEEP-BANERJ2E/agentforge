@@ -1,0 +1,74 @@
+# Groq Generation Session
+# Session ID: llm_20260517_192412
+# Timestamp: 2026-05-17T19:24:12.904925
+
+```yaml
+spec_version: v1
+kind: native
+name: weather_fetcher
+description: Fetches the current weather for a given city
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  Fetch the current weather for a given city using the Open-Meteo API.
+tools: [geocode, fetch_weather]
+```
+
+```python
+# filename: geocode.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def geocode(city: str) -> dict:
+    """Geocode a city using Open-Meteo geocoding API.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Geocoding API response data
+    """
+    url = "https://api.open-meteo.com/v1/search?name=" + urllib.parse.quote(city) + "&count=1"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"location": data["location"][0]}
+```
+
+```python
+# filename: fetch_weather.py
+# filename: requirements.txt
+# no external dependencies
+```
+
+```python
+# filename: fetch_weather.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+
+@tool
+async def fetch_weather(city: str) -> dict:
+    """Fetch the current weather for a given city using the Open-Meteo API.
+    
+    Args:
+        city: City name
+    
+    Returns:
+        Current weather data
+    """
+    geocode_data = await geocode(city)
+    lat = geocode_data["location"]["latitude"]
+    lon = geocode_data["location"]["longitude"]
+    url = f"https://api.open-meteo.com/v1/forecast?current_weather=true&latitude={lat}&longitude={lon}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return {"weather": data["current_weather"]}
+```

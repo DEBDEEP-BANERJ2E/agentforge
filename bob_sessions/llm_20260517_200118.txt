@@ -1,0 +1,89 @@
+# Groq Generation Session
+# Session ID: llm_20260517_200118
+# Timestamp: 2026-05-17T20:01:18.334750
+
+```yaml
+spec_version: v1
+kind: native
+name: github_pr_summarizer
+description: Summarizes open pull requests for a given GitHub repository, showing title, author, and how long open
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+style: default
+instructions: |
+  You help users summarize open pull requests for a GitHub repository.
+  Ask the user for the repository in the format "owner/repo".
+  Use the fetch_open_prs tool to get the list of open PRs.
+  Then present the summary with PR title, author, and how long it has been open.
+tools: [fetch_open_prs]
+```
+
+```python
+# filename: fetch_open_prs.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+import urllib.request
+import urllib.parse
+import json
+import os
+from datetime import datetime, timezone
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+@tool
+async def fetch_open_prs(repo: str) -> dict:
+    """Fetch open pull requests for a GitHub repository.
+
+    Args:
+        repo: Repository name in format "owner/repo" (e.g. "facebook/react")
+
+    Returns:
+        A dictionary containing a list of open PRs, each with title, author, created_at, and time_open.
+    """
+    url = f"https://api.github.com/repos/{urllib.parse.quote(repo)}/pulls?state=open"
+
+    req = urllib.request.Request(url)
+    if GITHUB_TOKEN:
+        req.add_header("Authorization", f"token {GITHUB_TOKEN}")
+    req.add_header("Accept", "application/vnd.github.v3+json")
+    req.add_header("User-Agent", "ibm-watsonx-orchestrate-agent")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        return {"error": f"GitHub API returned status {e.code}: {e.reason}"}
+    except urllib.error.URLError as e:
+        return {"error": f"Failed to reach GitHub API: {e.reason}"}
+
+    if not isinstance(data, list):
+        return {"error": "Unexpected response format from GitHub API"}
+
+    now = datetime.now(timezone.utc)
+    prs = []
+    for pr in data:
+        title = pr.get("title", "No title")
+        author = pr.get("user", {}).get("login", "Unknown")
+        created_at_str = pr.get("created_at", "")
+        if created_at_str:
+            created_dt = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            delta = now - created_dt
+            days = delta.days
+            hours = delta.seconds // 3600
+            if days > 0:
+                time_open = f"{days} day{'s' if days != 1 else ''} {hours} hour{'s' if hours != 1 else ''}"
+            else:
+                time_open = f"{hours} hour{'s' if hours != 1 else ''}"
+        else:
+            time_open = "Unknown"
+        prs.append({
+            "title": title,
+            "author": author,
+            "created_at": created_at_str,
+            "time_open": time_open
+        })
+    return {"pull_requests": prs}
+```
+
+```text
+# filename: requirements.txt
+# no external dependencies
+```
