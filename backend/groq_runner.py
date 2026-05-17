@@ -1,106 +1,80 @@
 """
-Groq Runner for Agent Generation.
+LLM Runner for Agent Generation.
 
-This module uses GroqCloud API for agent generation instead of Bob Shell CLI
-or watsonx.ai (which requires IBM Cloud provisioning permissions).
+Uses an OpenAI-compatible endpoint (configurable via .env) to generate
+watsonx Orchestrate ADK agents from plain-English prompts.
 
-Architecture:
-    User Prompt → Groq API → Generated Code → Validation → AgentGenerationResult
-    
-Benefits:
-    - No IBM Cloud provisioning needed
-    - Very fast inference (Groq's LPU architecture)
-    - Generous free tier
-    - OpenAI-compatible API
-    - Simple setup
+Configure via environment variables:
+    LLM_API_KEY   — API key for the LLM provider
+    LLM_BASE_URL  — Base URL of the OpenAI-compatible API
+    LLM_MODEL     — Model ID in provider format (e.g. opencode-go/kimi-k2.6)
 """
 
 import os
+import yaml
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-from groq import Groq
+from openai import OpenAI
 
 from models import AgentGenerationResult, ToolFile
 from parsers import extract_yaml_block, extract_python_files, extract_requirements
 from validators import validate_agent_yaml, validate_python_file
+from catalog_tools import get_catalog_tools, get_relevant_tools, format_tools_for_prompt
 
 
-def get_groq_client() -> Groq:
-    """
-    Create and return a Groq API client.
-    
-    Requires environment variable:
-        - GROQ_API_KEY: Get from https://console.groq.com/keys
-    
-    Returns:
-        Configured Groq client instance
-        
-    Raises:
-        ValueError: If GROQ_API_KEY is missing
-    """
-    api_key = os.environ.get('GROQ_API_KEY')
-    
+def get_llm_client() -> OpenAI:
+    api_key = os.environ.get('LLM_API_KEY')
+    base_url = os.environ.get('LLM_BASE_URL', 'https://opencode.ai/zen/go/v1')
+
     if not api_key:
         raise ValueError(
-            "GROQ_API_KEY environment variable is required. "
-            "Get your API key from: https://console.groq.com/keys"
+            "LLM_API_KEY environment variable is required. "
+            "Set it in your .env file."
         )
-    
-    return Groq(api_key=api_key)
+
+    return OpenAI(api_key=api_key, base_url=base_url)
 
 
-def generate_with_groq(
-    prompt: str, 
-    model: str = "llama-3.3-70b-versatile"
-) -> tuple[str, str]:
+def generate_with_llm(prompt: str) -> tuple[str, str]:
     """
-    Generate agent code using Groq API.
-    
+    Generate agent code using the configured LLM.
+
     Args:
-        prompt: The complete prompt including architect instructions
-        model: Model to use (default: llama-3.3-70b-versatile)
-               Options:
-               - llama-3.3-70b-versatile (best for structured output)
-               - deepseek-r1-distill-llama-70b (strong reasoning)
-               - mixtral-8x7b-32768 (good balance)
-               - llama3-8b-8192 (fastest)
-        
+        prompt: The complete architect prompt with user request injected.
+
     Returns:
         Tuple of (generated_text, session_id)
-        
-    Raises:
-        Exception: If API call fails
     """
-    client = get_groq_client()
-    
-    # Create chat completion
+    client = get_llm_client()
+    model = os.environ.get('LLM_MODEL', 'opencode-go/kimi-k2.6')
+
     response = client.chat.completions.create(
         model=model,
         messages=[
             {
                 "role": "system",
-                "content": "You are an expert at generating watsonx Orchestrate ADK agents. "
-                          "You output ONLY code blocks (YAML, Python, requirements.txt) with NO extra prose."
+                "content": (
+                    "You are an expert at generating watsonx Orchestrate ADK agents. "
+                    "Output ONLY the requested code blocks (YAML, Python, requirements.txt). "
+                    "No prose, no explanations, no markdown outside of fenced code blocks."
+                )
             },
             {
                 "role": "user",
                 "content": prompt
             }
         ],
-        temperature=0.3,  # Lower for more deterministic output
+        temperature=0.2,
         max_tokens=4000,
-        top_p=0.9,
-        stream=False
     )
-    
+
     generated_text = response.choices[0].message.content
-    
-    # Generate session ID
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    session_id = f"groq_{timestamp}"
-    
+    session_id = f"llm_{timestamp}"
+
     return generated_text, session_id
 
 
@@ -190,12 +164,26 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
             errors=[f"Failed to read prompt template: {str(e)}"]
         )
     
-    # Replace placeholder with user prompt
-    prompt = prompt_template.replace("{USER_PROMPT}", user_prompt)
+    # Fetch available catalog tools and inject into prompt
+    all_catalog_tools = []
+    try:
+        all_catalog_tools = get_catalog_tools(use_cache=True)
+        relevant_tools = get_relevant_tools(user_prompt, all_catalog_tools, max_tools=15)
+        tools_text = format_tools_for_prompt(relevant_tools, max_tools=15)
+    except Exception as e:
+        # If catalog discovery fails, continue without it
+        print(f"Warning: Failed to discover catalog tools: {str(e)}")
+        tools_text = "No catalog tools available (discovery failed)."
     
+    prompt = (
+        prompt_template
+        .replace("{USER_PROMPT}", user_prompt)
+        .replace("{AVAILABLE_TOOLS}", tools_text)
+    )
+
     # Check for required environment variables
     try:
-        get_groq_client()
+        get_llm_client()
     except ValueError as e:
         return AgentGenerationResult(
             status="api_error",
@@ -220,9 +208,9 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         else:
             current_prompt = prompt
         
-        # Call Groq API
+        # Call LLM
         try:
-            generated_text, session_id = generate_with_groq(current_prompt)
+            generated_text, session_id = generate_with_llm(current_prompt)
             
             # Save session output
             save_session_output(session_id, generated_text, script_dir)
@@ -247,7 +235,7 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                     requirements_txt=None,
                     raw_bob_output="",
                     bob_session_id="",
-                    errors=[f"Groq API error: {error_msg}"]
+                    errors=[f"LLM API error: {error_msg}"]
                 )
         
         # Parse the output
@@ -265,14 +253,32 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         else:
             validation_errors.append("No YAML configuration block found in output")
         
-        # Validate Python files
-        if not python_files_dict:
+        # Determine which tools in the YAML are catalog (already deployed) vs new
+        yaml_tool_names: set[str] = set()
+        if agent_yaml:
+            try:
+                _parsed = yaml.safe_load(agent_yaml)
+                yaml_tool_names = set(_parsed.get("tools", []))
+            except Exception:
+                pass
+
+        new_tool_names = {f[:-3] for f in python_files_dict}  # strip .py
+        available_tool_names = {tool.name for tool in all_catalog_tools}
+        catalog_tool_names = yaml_tool_names & available_tool_names  # already deployed
+        missing_tools = yaml_tool_names - new_tool_names - catalog_tool_names
+
+        # Validate Python files — only required for tools not in catalog
+        if not python_files_dict and not catalog_tool_names:
             validation_errors.append("No Python tool files found in output")
         else:
             for filename, code in python_files_dict.items():
                 file_errors = validate_python_file(filename, code)
                 if file_errors:
                     validation_errors.extend([f"{filename}: {err}" for err in file_errors])
+        if missing_tools:
+            validation_errors.append(
+                f"Tools referenced in YAML but not found in catalog or generated: {', '.join(missing_tools)}"
+            )
         
         # Check requirements
         if not requirements_txt:
@@ -280,12 +286,13 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
         
         # If validation passed, return success
         if not validation_errors:
-            # Convert python files dict to list of ToolFile objects
+            # Only include tools that aren't already in the catalog
             tools = [
                 ToolFile(filename=filename, content=code)
                 for filename, code in python_files_dict.items()
+                if filename[:-3] not in catalog_tool_names
             ]
-            
+
             return AgentGenerationResult(
                 status="ok",
                 agent_yaml=agent_yaml,
@@ -295,16 +302,16 @@ def generate_agent(user_prompt: str, max_retries: int = 2) -> AgentGenerationRes
                 bob_session_id=session_id,
                 errors=[]
             )
-        
+
         # If validation failed, accumulate errors for retry
         accumulated_errors = validation_errors
-        
+
         # If this was the last attempt, return validation_failed
         if attempt == max_retries:
-            # Convert python files dict to list of ToolFile objects (even if invalid)
             tools = [
                 ToolFile(filename=filename, content=code)
                 for filename, code in python_files_dict.items()
+                if filename[:-3] not in catalog_tool_names
             ]
             
             return AgentGenerationResult(
