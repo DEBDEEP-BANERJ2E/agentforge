@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Loader2, CheckCircle2, XCircle, ExternalLink, ArrowRight, Zap, Globe, Shield, Clock } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = '';
 
 interface TaskStatus {
   task_id: string;

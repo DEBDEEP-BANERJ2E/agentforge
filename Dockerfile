@@ -31,7 +31,8 @@ COPY backend/ ./backend/
 COPY api/ ./api/
 COPY frontend/ ./frontend/
 
-# Build Next.js for production
+# Build Next.js — BACKEND_URL is used server-side by next.config.mjs rewrites
+ENV BACKEND_URL=http://localhost:8000
 RUN cd frontend && npm run build
 
 # Create writable dirs needed at runtime
