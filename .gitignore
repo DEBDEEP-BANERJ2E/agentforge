@@ -23,5 +23,6 @@ bob_sessions/*
 !bob_sessions/README.md
 !bob_sessions/*.txt
 !bob_sessions/*.md
+!bob_sessions/*.png
 
 # Made with Bob
